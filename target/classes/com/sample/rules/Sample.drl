@@ -1,0 +1,96 @@
+package com.sample.rules
+ 
+import com.sample.Author;
+import com.sample.Genre;
+import com.sample.Book;
+import com.sample.Store;
+ 
+
+rule "Calculate Book Popularity"
+@Rule(agendaGroup = "pop-income-group")
+salience 10
+when
+    $book: Book()
+then
+    double popularity = ($book.getAuthor().getPopularity() + $book.getGenre().getPopularity()) / 2;
+    $book.setPopularity(popularity);
+    update($book);
+end
+
+rule "Expected Income Rule"
+@Rule(agendaGroup = "pop-income-group")
+salience 5
+    when
+        $store : Store(booksInStock != null, $booksInStock : booksInStock)
+		$income : Number() from accumulate(
+        	$book : Book() from $booksInStock,
+        sum($book.getPrice() * $book.getPopularity())
+     )   
+then
+	$store.setExIncome($income.doubleValue());
+    update($store);
+end
+
+rule "High Income Rule"
+@Rule(agendaGroup = "pop-income-group")
+salience 5
+    when
+        $store : Store(exIncome > 200000) 
+then
+	$store.setHighIncome(true);
+    update($store);
+    System.out.println("Store " + $store.getId() + "(" + $store.getAddress() + ") has a high expected income."); 
+end
+
+
+
+rule "Modern Author Rule"
+when
+    $author : Author(lifespan.matches("\\d{4}-\\d{0}"))
+then
+	$author.setModern(true);
+	update($author); 
+	System.out.println("Author " + $author.getName() + " is a modern author."); 
+	
+end
+
+
+rule "Modern Book Rule"
+when
+    $book : Book(author.getLifespan().matches("\\d{4}-\\d{0}"))
+then
+	$book.setModern(true);
+	update($book);
+	System.out.println("Book " + $book.getTitle() + " is a modern book."); 
+
+end
+
+
+rule "Authors in Stock Rule"
+when
+    $store : Store(booksInStock != null, $booksInStock : booksInStock)
+    
+    $authorsSet : java.util.Set() from accumulate(
+        $book : Book() from $booksInStock,
+        collectSet($book.getAuthor().getName())
+     )   
+then
+	$store.setAuthorsInStock($authorsSet);
+	update($store);  
+end
+
+rule "Genres in Store Rule"
+when
+    $store : Store(booksInStock != null, $booksInStock : booksInStock)
+    
+    $genresSet : java.util.Set() from accumulate(
+        $book : Book() from $booksInStock,
+        collectSet($book.getGenre().getTitle())
+     )   
+then
+	 $store.setGenresInStock($genresSet);
+	 update($store);     
+end
+
+
+
